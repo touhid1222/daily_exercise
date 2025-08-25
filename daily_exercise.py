@@ -5,32 +5,59 @@ import streamlit.components.v1 as components
 # ---------- App Setup ----------
 st.set_page_config(page_title="Calm Coach • Tohid", page_icon="🧘", layout="centered")
 
-# Mobile-first CSS
+# ---------- Global CSS (mobile-first, bigger UI) ----------
 st.markdown("""
 <style>
 html, body, [class^="css"]  { font-size: 18px; }
-.block-container { padding-top: 1rem; padding-bottom: 3rem; }
-.big-btn button { width:100%; padding:14px 18px; font-size:18px; border-radius:12px; }
-.kbd {display:inline-block;padding:2px 6px;border:1px solid #aaa;border-bottom-width:2px;border-radius:6px;background:#f7f7f7}
-.card {border:1px solid #e7e7e7;border-radius:14px;padding:14px;margin:8px 0;background:#fff}
-.hint {color:#666;font-size:0.9rem}
-.center {text-align:center}
-.title {font-weight:700;font-size:1.3rem;margin-bottom:4px}
-.timer {font-size:42px;font-weight:700; text-align:center; margin:10px 0;}
-.status {font-size:22px;text-align:center;margin:4px 0 10px}
-.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#eef5ff;border:1px solid #cfe0ff;font-size:0.9rem;margin:2px 4px}
-.breath-wrap {display:flex;justify-content:center;align-items:center;margin:10px 0 16px}
-.circle {width:180px;height:180px;border-radius:50%;border:4px solid #9fc5ff;background:#f0f7ff;
-         display:flex;justify-content:center;align-items:center;transform:scale(1);transition:transform 0.6s ease;}
-.action-row {display:flex; gap:8px; }
-.action-row > div {flex:1}
+.block-container { padding-top: 0.8rem; padding-bottom: 3rem; }
+
+/* Bigger controls */
+.stButton>button, button { 
+  width: 100%; padding: 16px 18px; font-size: 18px; 
+  border-radius: 14px; border: 1px solid #ddd; 
+}
+.stDownloadButton>button { padding: 12px 14px; border-radius: 12px; }
+.stTextInput>div>div>input, .stTextArea textarea, select {
+  font-size: 18px; padding: 12px; border-radius: 12px;
+}
+.stSlider { padding-top: 4px; }
+
+/* Cards & helpers */
+.card {border:1px solid #e7e7e7;border-radius:16px;padding:14px;margin:10px 0;background:#fff}
+.title {font-weight:700;font-size:1.25rem;margin-bottom:6px}
+.hint {color:#666;font-size:0.92rem}
 .small {font-size:0.85rem;}
+.center {text-align:center}
+.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#eef5ff;border:1px solid #cfe0ff;font-size:0.9rem;margin:2px 4px}
+.timer {font-size:46px;font-weight:700; text-align:center; margin:10px 0;}
+.status {font-size:26px;text-align:center;margin:4px 0 10px}
+
+/* Breathing visual — bigger, smoother, with gradient bubble */
+.breath-wrap {display:flex;justify-content:center;align-items:center;margin:10px 0 16px}
+.circle {
+  width: 240px; height: 240px; border-radius: 50%;
+  border: 4px solid #9fc5ff;
+  background: radial-gradient( circle at 50% 50%, #f7fbff 0%, #e9f3ff 60%, #d7e9ff 100% );
+  box-shadow: 0 0 0 rgba(159,197,255,0.6);
+  display:flex;justify-content:center;align-items:center;
+  transform:scale(1); transition: transform 0.7s ease;
+}
+.bigPhase { font-size: 34px; font-weight: 700; }
+
+/* Meeting Primer card */
+.primer-grid {
+  display: grid; grid-template-columns: 1fr; gap: 8px;
+}
+@media (min-width: 800px) {
+  .primer-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+
 footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 # ---------- Session defaults ----------
-if "voice_rate" not in st.session_state: st.session_state.voice_rate = 1.0
+if "voice_rate" not in st.session_state: st.session_state.voice_rate = 0.95
 if "voice_pitch" not in st.session_state: st.session_state.voice_pitch = 1.05  # slightly brighter
 if "voice_lang" not in st.session_state: st.session_state.voice_lang = "en-US"
 if "log_df" not in st.session_state:
@@ -38,38 +65,75 @@ if "log_df" not in st.session_state:
 
 # ---------- Utilities ----------
 def voice_picker_component():
-    """JS voice picker; stores selection in localStorage('cc_voiceName')."""
+    """
+    Curated voice picker: show only 3–5 'sweet' voices if present (Siri/soft female/Google US).
+    Falls back to top en voices and Bangla if found.
+    Saves selection to localStorage('cc_voiceName').
+    """
     components.html("""
 <div class="card">
-  <div class="title">🎙️ Voice Picker (device voices)</div>
-  <select id="vp_select" style="width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;"></select>
-  <div class="action-row" style="margin-top:8px;">
-    <div><button id="vp_save">💾 Save</button></div>
-    <div><button id="vp_test">🔊 Test voice</button></div>
+  <div class="title">🎙️ Voice Picker (curated)</div>
+  <select id="vp_select" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;"></select>
+  <div class="action-row" style="display:flex;gap:8px;margin-top:10px;">
+    <button id="vp_save">💾 Save</button>
+    <button id="vp_test">🔊 Test voice</button>
   </div>
   <div class="hint small" id="vp_note">Loading voices…</div>
 </div>
 <script>
+function curate(voices){
+  // Preferred patterns (order matters). Label makes it friendly for user.
+  const prefs = [
+    {re:/siri.*(en|us)/i, label:"Siri (Soft)"},
+    {re:/samantha|ava|victoria/i, label:"Apple Female"},
+    {re:/google us english/i, label:"Google US English"},
+    {re:/uk english.*female|google uk english female/i, label:"UK Soft"},
+    {re:/bn|bangla|bengali/i, label:"Bangla (if present)"}
+  ];
+  let picked = [];
+
+  // Try to match preferred patterns first
+  for (const p of prefs){
+    const v = voices.find(v => p.re.test((v.name||"")+" "+(v.lang||"")));
+    if (v && !picked.includes(v)) picked.push(v);
+    if (picked.length >= 5) break;
+  }
+
+  // Fallback: add a couple of en voices if still short
+  if (picked.length < 3) {
+    const extra = voices.filter(v => (v.lang||"").toLowerCase().startsWith("en"));
+    for (const v of extra){
+      if (!picked.includes(v)) picked.push(v);
+      if (picked.length >= 5) break;
+    }
+  }
+  // Ensure uniqueness and cap to 5
+  return picked.slice(0,5);
+}
+
 function loadVoices() {
   const sel = document.getElementById('vp_select');
   sel.innerHTML = '';
-  const voices = speechSynthesis.getVoices();
   const chosen = localStorage.getItem('cc_voiceName') || '';
-  if (!voices || voices.length === 0) {
+
+  const all = speechSynthesis.getVoices() || [];
+  if (all.length === 0) {
     document.getElementById('vp_note').innerText = "If empty, tap Test once or reload. On iPhone, turn Silent Mode OFF.";
     return;
   }
-  voices.forEach(v => {
+  const filtered = curate(all);
+  filtered.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.name;
-    opt.text = v.name + ' — ' + v.lang;
+    opt.text = (v.name || 'Voice') + ' — ' + (v.lang || '');
     if (v.name === chosen) opt.selected = true;
     sel.appendChild(opt);
   });
-  document.getElementById('vp_note').innerText = "Tip: On iPhone, pick a Siri voice for a softer tone.";
+  document.getElementById('vp_note').innerText = "Tip: On iPhone, pick a Siri voice for a soft, natural guide.";
 }
 window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
+
 document.getElementById('vp_save').onclick = () => {
   const name = document.getElementById('vp_select').value;
   localStorage.setItem('cc_voiceName', name);
@@ -84,34 +148,31 @@ document.getElementById('vp_test').onclick = () => {
   speechSynthesis.cancel(); speechSynthesis.speak(u);
 };
 </script>
-""", height=210)
+""", height=230)
 
 def tts_buttons(text, key, rate=None, pitch=None, lang=None):
-    """Render Speak/Pause/Resume/Stop using Web Speech API with saved voice."""
+    """Speak/Pause/Resume/Stop using Web Speech API with saved voice (curated)."""
     rate = rate or st.session_state.voice_rate
     pitch = pitch or st.session_state.voice_pitch
     lang = lang or st.session_state.voice_lang
-    # double braces to escape for f-string
     html = f"""
-<div class="action-row">
-  <div><button onclick="speak_{key}()">▶️ Speak</button></div>
-  <div><button onclick="pause_{key}()">⏸️ Pause</button></div>
-  <div><button onclick="resume_{key}()">⏩ Resume</button></div>
-  <div><button onclick="stop_{key}()">⏹️ Stop</button></div>
+<div class="action-row" style="display:flex;gap:8px;">
+  <button onclick="speak_{key}()">▶️ Speak</button>
+  <button onclick="pause_{key}()">⏸️ Pause</button>
+  <button onclick="resume_{key}()">⏩ Resume</button>
+  <button onclick="stop_{key}()">⏹️ Stop</button>
 </div>
 <script>
 const supported_{key} = ('speechSynthesis' in window);
 let u_{key} = new SpeechSynthesisUtterance({json.dumps(text)});
-u_{key}.rate = {rate};
-u_{key}.pitch = {pitch};
-u_{key}.lang = "{lang}";
+u_{key}.rate = {rate}; u_{key}.pitch = {pitch}; u_{key}.lang = "{lang}";
 function pickVoice(u) {{
   if(!supported_{key}) return;
   const voices = window.speechSynthesis.getVoices();
   const chosen = localStorage.getItem('cc_voiceName');
   let v = null;
   if (chosen) v = voices.find(x => x.name === chosen) || null;
-  if (!v) v = voices.find(x => x.name && x.name.toLowerCase().includes('siri')) || null; // iOS sweet voice
+  if (!v) v = voices.find(x => /siri/i.test((x.name||'')+' '+(x.lang||''))) || null; // prefer Siri if present
   if (v) u.voice = v;
 }}
 function speak_{key}() {{
@@ -125,10 +186,10 @@ function resume_{key}() {{ if(supported_{key}) window.speechSynthesis.resume(); 
 function stop_{key}() {{ if(supported_{key}) window.speechSynthesis.cancel(); }}
 </script>
 """
-    components.html(html, height=60)
+    components.html(html, height=70)
 
-def breathing_component(pattern, cycles, key="breath", rate=None, pitch=None, lang=None):
-    """Animated breathing coach with voice cues (fixed KeyError by passing rate/pitch/lang)."""
+def breathing_component(pattern, cycles, key="breath", rate=None, pitch=None, lang=None, chime=True):
+    """Animated breathing coach with large INHALE/EXHALE text, smooth bubble, optional chime."""
     rate = rate or st.session_state.voice_rate
     pitch = pitch or st.session_state.voice_pitch
     lang = lang or st.session_state.voice_lang
@@ -139,110 +200,139 @@ def breathing_component(pattern, cycles, key="breath", rate=None, pitch=None, la
         "Physiological Sigh": [("Inhale",2,"expand"),("Top-up inhale",2,"expand"),("Exhale",6,"shrink")]
     }
     steps = patterns[pattern]
+
     html = """
 <div class="card">
-  <div class="title">Paced Breathing — {pattern} × {cycles}</div>
-  <div class="breath-wrap"><div id="circle_{key}" class="circle"><span id="count_{key}" class="timer">Ready</span></div></div>
-  <div id="phase_{key}" class="status">Press Start</div>
-  <div class="action-row">
-    <div><button id="start_{key}">▶️ Start</button></div>
-    <div><button id="stop_{key}">⏹️ Stop</button></div>
+  <div class="title">Paced Breathing — %s × %s</div>
+  <div class="breath-wrap">
+    <div id="circle_%s" class="circle">
+      <div style="text-align:center;">
+        <div id="phaseBig_%s" class="bigPhase">Ready</div>
+        <div id="count_%s" class="timer">—</div>
+      </div>
+    </div>
   </div>
-  <div class="hint small">Tip: breathe through nose, exhale longer than inhale. If dizzy, stop and breathe normally.</div>
+  <div class="action-row" style="display:flex;gap:8px;">
+    <button id="start_%s">▶️ Start</button>
+    <button id="stop_%s">⏹️ Stop</button>
+  </div>
+  <div class="hint small">Tip: Nose breathing. Exhale slightly longer. If dizzy, stop and breathe normally.</div>
 </div>
 <script>
-const supported_{key} = ('speechSynthesis' in window);
-const steps_{key} = {steps_json};
-const maxCycles_{key} = {cycles};
-let rate_{key} = {rate};
-let pitch_{key} = {pitch};
-let lang_{key} = "{lang}";
-let timers_{key} = [];
-let running_{key} = false;
+const supported_%s = ('speechSynthesis' in window);
+const steps_%s = %s;
+const maxCycles_%s = %s;
+let rate_%s = %s, pitch_%s = %s, lang_%s = "%s";
+let timers_%s = []; let running_%s = false;
 
-function pickVoice_{key}(u) {{
-  if(!supported_{key}) return;
+// Optional soft chime using WebAudio
+function chime_%s(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 660;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.value = 0.0001; o.start();
+    g.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.3);
+    o.stop(ctx.currentTime+0.32);
+  }catch(e){}
+}
+
+function pickVoice_%s(u){
+  if(!supported_%s) return;
   const voices = window.speechSynthesis.getVoices();
   const chosen = localStorage.getItem('cc_voiceName');
   let v = null;
   if (chosen) v = voices.find(x => x.name === chosen) || null;
-  if (!v) v = voices.find(x => x.name && x.name.toLowerCase().includes('siri')) || null;
+  if (!v) v = voices.find(x => /siri/i.test((x.name||'')+' '+(x.lang||''))) || null;
   if (v) u.voice = v;
-}}
-
-function speakNow_{key}(text) {{
-  if(!supported_{key}) return;
+}
+function speakNow_%s(text){
+  if(!supported_%s) return;
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = rate_{key}; u.pitch = pitch_{key}; u.lang = lang_{key};
-  pickVoice_{key}(u);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
-}}
+  u.rate = rate_%s; u.pitch = pitch_%s; u.lang = lang_%s;
+  pickVoice_%s(u);
+  window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+}
 
-function setPhase_{key}(label, secs, action) {{
-  const phase = document.getElementById("phase_{key}");
-  const count = document.getElementById("count_{key}");
-  const circle = document.getElementById("circle_{key}");
-  phase.innerText = label + " (" + secs + "s)";
+function setPhase_%s(label, secs, action){
+  const big = document.getElementById("phaseBig_%s");
+  const count = document.getElementById("count_%s");
+  const circle = document.getElementById("circle_%s");
+
+  big.innerText = label;
   let scale = 1.0;
-  if(action === "expand") scale = 1.25;
-  else if(action === "shrink") scale = 0.85;
+  if(action === "expand") scale = 1.35;
+  else if(action === "shrink") scale = 0.83;
   circle.style.transform = "scale(" + scale + ")";
+
   let remaining = secs;
   count.innerText = remaining;
-  let iv = setInterval(()=>{{
-     remaining -= 1;
-     if(remaining <= 0) {{ clearInterval(iv); }}
-     else {{ count.innerText = remaining; }}
-  }}, 1000);
-  timers_{key}.push(iv);
-}}
+  const iv = setInterval(()=>{
+    remaining -= 1;
+    if(remaining <= 0){ clearInterval(iv); }
+    else { count.innerText = remaining; }
+  }, 1000);
+  timers_%s.push(iv);
+}
 
-function clearTimers_{key}() {{
-  for (const t of timers_{key}) clearInterval(t);
-  timers_{key} = [];
-}}
+function clearTimers_%s(){ for (const t of timers_%s) clearInterval(t); timers_%s = []; }
 
-function stopAll_{key}() {{
-  running_{key} = false;
-  clearTimers_{key}();
-  document.getElementById("phase_{key}").innerText = "Stopped";
-  document.getElementById("count_{key}").innerText = "Ready";
-  document.getElementById("circle_{key}").style.transform = "scale(1)";
-  if(supported_{key}) window.speechSynthesis.cancel();
-}}
+function stopAll_%s(){
+  running_%s = false;
+  clearTimers_%s();
+  document.getElementById("phaseBig_%s").innerText = "Stopped";
+  document.getElementById("count_%s").innerText = "—";
+  document.getElementById("circle_%s").style.transform = "scale(1)";
+  if(supported_%s) window.speechSynthesis.cancel();
+}
 
-function startFlow_{key}() {{
-  if(running_{key}) return;
-  running_{key} = true;
+function startFlow_%s(){
+  if(running_%s) return;
+  running_%s = true;
   let cycle = 0;
-  function runCycle() {{
-    if(!running_{key}) return;
-    if(cycle >= maxCycles_{key}) {{ stopAll_{key}(); return; }}
+  function runCycle(){
+    if(!running_%s) return;
+    if(cycle >= maxCycles_%s){ stopAll_%s(); return; }
     let i = 0;
-    function nextStep() {{
-      if(!running_{key}) return;
-      if(i >= steps_{key}.length) {{ cycle += 1; runCycle(); return; }}
-      const step = steps_{key}[i];
+    function nextStep(){
+      if(!running_%s) return;
+      if(i >= steps_%s.length){ cycle += 1; runCycle(); return; }
+      const step = steps_%s[i];
       const label = step[0]; const secs = step[1]; const action = step[2];
-      setPhase_{key}(label, secs, action);
-      speakNow_{key}(label);
-      let t = setTimeout(()=>{{ i += 1; nextStep(); }}, secs*1000);
-      timers_{key}.push(t);
-    }}
+      setPhase_%s(label, secs, action);
+      %s
+      %s
+      let t = setTimeout(()=>{ i += 1; nextStep(); }, secs*1000);
+      timers_%s.push(t);
+    }
     nextStep();
-  }}
+  }
   runCycle();
-}}
+}
 
-document.getElementById("start_{key}").onclick = startFlow_{key};
-document.getElementById("stop_{key}").onclick = stopAll_{key};
+document.getElementById("start_%s").onclick = startFlow_%s;
+document.getElementById("stop_%s").onclick = stopAll_%s;
 </script>
-""".format(
-        pattern=pattern, cycles=cycles, key=key,
-        steps_json=json.dumps(steps), rate=rate, pitch=pitch, lang=lang
+""" % (
+        pattern, cycles, key, key, key, key, key,
+        key, key, json.dumps(steps), key, cycles,
+        key, rate, key, pitch, key, lang,
+        key, key,
+        key,
+        key, key,
+        key, key,
+        key, key, key, key,
+        key, key, key, key,
+        key,
+        key, key, key, key, key,
+        "speakNow_%s(label);" % key,
+        "chime_%s();" % key if chime else "",
+        key,
+        key, key, key
     )
-    components.html(html, height=360)
+    components.html(html, height=420)
 
 def sequence_caller(title, cues, interval_ms, rounds, key="seq", rate=None, pitch=None, lang=None):
     """Voice + visual cue every interval (triangle gaze, etc.)."""
@@ -251,82 +341,82 @@ def sequence_caller(title, cues, interval_ms, rounds, key="seq", rate=None, pitc
     lang = lang or st.session_state.voice_lang
     html = """
 <div class="card">
-  <div class="title">{title}</div>
-  <div id="cue_{key}" class="status" style="font-size:28px;">Ready</div>
-  <div class="timer" id="round_{key}"></div>
-  <div class="action-row">
-    <div><button id="start_{key}">▶️ Start</button></div>
-    <div><button id="stop_{key}">⏹️ Stop</button></div>
+  <div class="title">%s</div>
+  <div id="cue_%s" class="status" style="font-size:28px;">Ready</div>
+  <div class="timer" id="round_%s"></div>
+  <div class="action-row" style="display:flex;gap:8px;">
+    <button id="start_%s">▶️ Start</button>
+    <button id="stop_%s">⏹️ Stop</button>
   </div>
   <div class="hint small">Keep blinking normally. Tiny natural glances are okay.</div>
 </div>
 <script>
-const cues_{key} = {cues};
-const interval_{key} = {interval};
-const rounds_{key} = {rounds};
-const supported_{key} = ('speechSynthesis' in window);
-let rate_{key} = {rate};
-let pitch_{key} = {pitch};
-let lang_{key} = "{lang}";
-let timer_{key} = null;
-let isRunning_{key} = false;
+const cues_%s = %s;
+const interval_%s = %s;
+const rounds_%s = %s;
+const supported_%s = ('speechSynthesis' in window);
+let rate_%s = %s, pitch_%s = %s, lang_%s = "%s";
+let timer_%s = null, isRunning_%s = false;
 
-function pickVoice_{key}(u) {{
-  if(!supported_{key}) return;
+function pickVoice_%s(u){
+  if(!supported_%s) return;
   const voices = window.speechSynthesis.getVoices();
   const chosen = localStorage.getItem('cc_voiceName');
   let v = null;
   if (chosen) v = voices.find(x => x.name === chosen) || null;
-  if (!v) v = voices.find(x => x.name && x.name.toLowerCase().includes('siri')) || null;
+  if (!v) v = voices.find(x => /siri/i.test((x.name||'')+' '+(x.lang||''))) || null;
   if (v) u.voice = v;
-}}
-
-function speak_{key}(t) {{
-  if(!supported_{key}) return;
+}
+function speak_%s(t){
+  if(!supported_%s) return;
   const u = new SpeechSynthesisUtterance(t);
-  u.rate = rate_{key}; u.pitch = pitch_{key}; u.lang = lang_{key};
-  pickVoice_{key}(u);
+  u.rate = rate_%s; u.pitch = pitch_%s; u.lang = lang_%s;
+  pickVoice_%s(u);
   window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
-}}
-
-function stop_{key}() {{
-  isRunning_{key} = false;
-  if(timer_{key}) clearInterval(timer_{key});
-  document.getElementById("cue_{key}").innerText = "Stopped";
-  document.getElementById("round_{key}").innerText = "";
-  if(supported_{key}) window.speechSynthesis.cancel();
-}}
-
-function start_{key}() {{
-  if(isRunning_{key}) return;
-  isRunning_{key} = true;
+}
+function stop_%s(){
+  isRunning_%s = false;
+  if(timer_%s) clearInterval(timer_%s);
+  document.getElementById("cue_%s").innerText = "Stopped";
+  document.getElementById("round_%s").innerText = "";
+  if(supported_%s) window.speechSynthesis.cancel();
+}
+function start_%s(){
+  if(isRunning_%s) return;
+  isRunning_%s = true;
   let idx = 0; let count = 0;
-  document.getElementById("round_{key}").innerText = "Round 1 of " + rounds_{key};
-  function tick() {{
-     if(!isRunning_{key}) return;
-     const text = cues_{key}[idx % cues_{key}.length];
-     document.getElementById("cue_{key}").innerText = text;
-     speak_{key}(text);
+  document.getElementById("round_%s").innerText = "Round 1 of " + rounds_%s;
+  function tick(){
+     if(!isRunning_%s) return;
+     const text = cues_%s[idx % cues_%s.length];
+     document.getElementById("cue_%s").innerText = text;
+     speak_%s(text);
      idx += 1;
-     if(idx % cues_{key}.length === 0) {{
+     if(idx %% cues_%s.length === 0) {
         count += 1;
-        document.getElementById("round_{key}").innerText = "Round " + (count+1) + " of " + rounds_{key};
-        if(count >= rounds_{key}) {{ stop_{key}(); }}
-     }}
-  }}
+        document.getElementById("round_%s").innerText = "Round " + (count+1) + " of " + rounds_%s;
+        if(count >= rounds_%s) { stop_%s(); }
+     }
+  }
   tick();
-  timer_{key} = setInterval(tick, interval_{key});
-}}
-
-document.getElementById("start_{key}").onclick = start_{key};
-document.getElementById("stop_{key}").onclick = stop_{key};
+  timer_%s = setInterval(tick, interval_%s);
+}
+document.getElementById("start_%s").onclick = start_%s;
+document.getElementById("stop_%s").onclick = stop_%s;
 </script>
-""".format(
-        title=title, key=key, cues=json.dumps(cues),
-        interval=interval_ms, rounds=rounds,
-        rate=rate, pitch=pitch, lang=lang
+""" % (
+        title, key, key, key, key,
+        key, json.dumps(cues),
+        key, interval_ms,
+        key, rounds,
+        key,
+        key, rate, key, pitch, key, lang,
+        key, key,
+        key, key,
+        key, key, key, key, key,
+        key, key, key, key, key, key, key, key, key
     )
-    components.html(html, height=250)
+    components.html(html, height=260)
 
 def save_log(module, duration_sec, notes="", rating=None):
     new = pd.DataFrame([{
@@ -359,7 +449,6 @@ try:
         default="Quick Calm"
     )
 except Exception:
-    # Fallback if Streamlit version doesn't support segmented_control
     menu = st.radio(
         "Choose a module:",
         options=[
@@ -373,7 +462,7 @@ except Exception:
 # ---------- Modules ----------
 if menu == "Settings":
     st.subheader("🎚️ Voice & App Settings")
-    st.write("1) Pick **language**, 2) Pick a **device voice** (e.g., Siri), 3) Adjust rate/pitch.")
+    st.write("1) Pick **language**, 2) Pick a **curated voice** (e.g., Siri), 3) Adjust rate/pitch.")
     st.session_state.voice_lang = st.selectbox("Voice language", ["en-US","bn-BD"], index=0)
     st.session_state.voice_rate = st.slider("Voice rate (1.0 normal)", 0.6, 1.6, st.session_state.voice_rate, 0.05)
     st.session_state.voice_pitch = st.slider("Voice pitch (1.0 normal)", 0.6, 1.6, st.session_state.voice_pitch, 0.05)
@@ -404,10 +493,10 @@ elif menu == "Quick Calm":
 elif menu == "Breathing Coach":
     st.subheader("🌬️ Guided Breathing")
     pattern = st.selectbox("Pattern", ["Box (4-4-4-4)","4-7-8","Physiological Sigh"])
-    cycles = st.slider("Number of cycles", 3, 10, 5)
+    cycles = st.slider("Number of cycles", 3, 12, 6)
     st.markdown('<div class="hint">Tip: Use 4-7-8 before a talk; Box during meetings; Sigh when heart is spiking.</div>', unsafe_allow_html=True)
-    breathing_component(pattern, cycles, key="bc")
-    st.markdown("**Why it helps:** longer exhale = slows heart; box = steady focus.")
+    breathing_component(pattern, cycles, key="bc", chime=True)
+    st.markdown("**Why it helps:** longer exhale → slower heart; box → steady focus.")
     tts_buttons("Start breathing now. Follow the prompts. Keep the exhale soft and longer.", key="bc2")
 
 elif menu == "Voice Warmup":
@@ -468,40 +557,75 @@ elif menu == "Micro-Exposure":
         save_log("Micro-Exposure", total, notes=f"{rounds} prompts")
 
 elif menu == "Meeting Primer":
-    st.subheader("⚙️ 5-min Pre-Meeting Energy")
-    st.markdown("""
-- **Body reset:** stand tall, feet planted, shoulders down  
-- **Glute squeeze:** 3× for 3s  
-- **Box breaths:** 6 cycles  
-- **First line practice:** 3 times, slower
-""")
-    tts_buttons("Stand tall. Shoulders down. Squeeze glutes three times for three seconds. Now we do six box breaths. Then say your first line three times, slower each time.", key="mp1")
-    st.markdown("#### 1) Glute squeeze (3×)")
-    if st.button("▶️ Start 3×3s", use_container_width=True):
-        ph = st.empty()
-        for rep in range(1,4):
-            ph.markdown(f'<div class="status">Hold — rep {rep}/3</div><div class="timer">3</div>', unsafe_allow_html=True); time.sleep(1)
-            ph.markdown(f'<div class="status">Hold — rep {rep}/3</div><div class="timer">2</div>', unsafe_allow_html=True); time.sleep(1)
-            ph.markdown(f'<div class="status">Hold — rep {rep}/3</div><div class="timer">1</div>', unsafe_allow_html=True); time.sleep(1)
-            st.success(f"Rep {rep} done.")
-        save_log("Meeting Primer - glute", 9)
-    st.markdown("#### 2) Box breaths (6 cycles)")
-    breathing_component("Box (4-4-4-4)", 6, key="mp_box")
-    st.markdown("#### 3) First line")
-    first_line = st.text_input("Type your first sentence", value="Quick update in 30 seconds: [point-1], [point-2], blocker is [X].")
-    tts_buttons("Say your first line three times, slower each time.", key="mp2")
-    st.info("If heart still races, add 2–3 physiological sighs right before you start.")
+    st.subheader("⚙️ 5-min Pre-Meeting Energy + Intel-style Prep")
+    st.markdown("Make it sharp for managers, coworkers, and techs. Build your **P-R-A** (Purpose, Result, Ask).")
+
+    with st.form("primer_form"):
+        colA, colB = st.columns(2)
+        with colA:
+            meeting_type = st.selectbox("Meeting type", ["1:1", "Stand-up", "Design/Process Review", "Cross-team sync", "With Techs on tool"])
+            audience = st.multiselect("Stakeholders", ["Manager", "Coworkers", "Techs", "Vendors", "Cross-module"], default=["Manager","Coworkers"])
+        with colB:
+            duration_min = st.slider("Prep timer (min)", 2, 10, 5)
+            decision_needed = st.toggle("Decision needed today?")
+        purpose = st.text_input("Purpose (1 line)", value="Share W-Dep update and align on blocker.")
+        results = st.text_area("Result / Status (bullets)", value="- Tool uptime ↑ to 92%\n- New recipe reduces seam defects 18%\n- SPC MR rule firing dropped last 48h")
+        risks_asks = st.text_area("Risk & Ask (bullets)", value="- Risk: wafer edge over-etch on lot 57A\n- Ask: approval to run 3 more quals tonight")
+        opener_hint = st.text_input("First line (say 3× slower)", value="Quick 30-sec update: progress on uptime, seam defects, and one blocker.")
+        submit = st.form_submit_button("✨ Build primer")
+
+    if submit:
+        # Build a compact PRA card
+        pra = f"Purpose: {purpose}\nResult: {results}\nAsk: {risks_asks}\nDecision today: {'Yes' if decision_needed else 'No'}"
+        st.markdown(f"""<div class="card"><div class="title">P-R-A Card</div>
+<pre style="white-space:pre-wrap;font-size:16px">{pra}</pre></div>""", unsafe_allow_html=True)
+        tts_buttons(f"{opener_hint}. Then purpose, result, and ask. Keep it tight.", key="mp_opener")
+
+        # Quick energy routine
+        st.markdown("#### 1) Glute squeeze (3× for 3s)")
+        if st.button("▶️ Start 3×3s", use_container_width=True):
+            ph = st.empty()
+            for rep in range(1,4):
+                for s in [3,2,1]:
+                    ph.markdown(f'<div class="status">Hold — rep {rep}/3</div><div class="timer">{s}</div>', unsafe_allow_html=True)
+                    time.sleep(1)
+                st.success(f"Rep {rep} done.")
+            save_log("Meeting Primer - glute", 9)
+
+        st.markdown("#### 2) Box breaths (6 cycles)")
+        breathing_component("Box (4-4-4-4)", 6, key="mp_box", chime=True)
+
+        st.markdown("#### 3) First line practice")
+        st.text(opener_hint)
+        tts_buttons("Say your first line three times, slower each time.", key="mp2")
+        st.info("If heart still races, add 2–3 physiological sighs right before you start.")
+
+    # Optional countdown to start the meeting
+    if submit and duration_min:
+        if st.button(f"▶️ Start {duration_min}-min prep timer", use_container_width=True):
+            ph = st.empty()
+            total = duration_min * 60
+            for s in range(total, -1, -1):
+                mm = s // 60; ss = s % 60
+                ph.markdown(f'<div class="timer">{mm:02d}:{ss:02d}</div>', unsafe_allow_html=True)
+                time.sleep(1)
+            st.success("Prep done. You’re ready.")
+            save_log("Meeting Primer - timer", total)
 
 elif menu == "Reflect & Logs":
     st.subheader("📝 Reflection & Progress")
     st.dataframe(st.session_state.log_df, use_container_width=True)
-    with st.form("logform"):
+
+    # ✅ Use a form + st.form_submit_button (fixes 'Missing Submit Button' error)
+    with st.form("logform", clear_on_submit=True):
         module = st.selectbox("Module", ["Quick Calm","Breathing Coach","Voice Warmup","Triangle Gaze","Micro-Exposure","Meeting Primer","Other"])
         dur = st.number_input("Duration (sec)", min_value=10, max_value=3600, value=60)
         rating = st.slider("How did it feel?", 1, 5, 4)
-    notes = st.text_area("Notes (optional)")
-    if st.button("Save entry"):
+        notes = st.text_area("Notes (optional)")
+        submitted = st.form_submit_button("💾 Save entry")
+    if submitted:
         save_log(module, dur, notes, rating)
         st.success("Saved.")
+
     csv = st.session_state.log_df.to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download CSV", data=csv, file_name="calmcoach_logs.csv", mime="text/csv")
