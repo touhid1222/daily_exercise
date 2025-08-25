@@ -2,6 +2,14 @@ import time, json, datetime, pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+
+def _tpl(s: str, **vals) -> str:
+    """Very safe string templating: replaces __NAME__ tokens only."""
+    for k, v in vals.items():
+        s = s.replace(f"__{k}__", str(v))
+    return s
+
+
 # ---------- App Setup ----------
 st.set_page_config(page_title="Calm Coach • Tohid", page_icon="🧘", layout="centered")
 
@@ -189,7 +197,7 @@ function stop_{key}() {{ if(supported_{key}) window.speechSynthesis.cancel(); }}
     components.html(html, height=70)
 
 def breathing_component(pattern, cycles, key="breath", rate=None, pitch=None, lang=None, chime=True):
-    """Animated breathing coach with large INHALE/EXHALE text, smooth bubble, optional chime."""
+    """Animated breathing coach with large INHALE/EXHALE, smooth bubble, optional chime. No % formatting."""
     rate = rate or st.session_state.voice_rate
     pitch = pitch or st.session_state.voice_pitch
     lang = lang or st.session_state.voice_lang
@@ -201,32 +209,32 @@ def breathing_component(pattern, cycles, key="breath", rate=None, pitch=None, la
     }
     steps = patterns[pattern]
 
-    html = """
+    template = """
 <div class="card">
-  <div class="title">Paced Breathing — %s × %s</div>
+  <div class="title">Paced Breathing — __PATTERN__ × __CYCLES__</div>
   <div class="breath-wrap">
-    <div id="circle_%s" class="circle">
+    <div id="circle___KEY__" class="circle">
       <div style="text-align:center;">
-        <div id="phaseBig_%s" class="bigPhase">Ready</div>
-        <div id="count_%s" class="timer">—</div>
+        <div id="phaseBig___KEY__" class="bigPhase">Ready</div>
+        <div id="count___KEY__" class="timer">—</div>
       </div>
     </div>
   </div>
   <div class="action-row" style="display:flex;gap:8px;">
-    <button id="start_%s">▶️ Start</button>
-    <button id="stop_%s">⏹️ Stop</button>
+    <button id="start___KEY__">▶️ Start</button>
+    <button id="stop___KEY__">⏹️ Stop</button>
   </div>
   <div class="hint small">Tip: Nose breathing. Exhale slightly longer. If dizzy, stop and breathe normally.</div>
 </div>
 <script>
-const supported_%s = ('speechSynthesis' in window);
-const steps_%s = %s;
-const maxCycles_%s = %s;
-let rate_%s = %s, pitch_%s = %s, lang_%s = "%s";
-let timers_%s = []; let running_%s = false;
+const supported___KEY__ = ('speechSynthesis' in window);
+const steps___KEY__ = __STEPS__;
+const maxCycles___KEY__ = __CYCLES__;
+let rate___KEY__ = __RATE__, pitch___KEY__ = __PITCH__, lang___KEY__ = "__LANG__";
+let timers___KEY__ = []; let running___KEY__ = false;
 
 // Optional soft chime using WebAudio
-function chime_%s(){
+function chime___KEY__(){
   try{
     const ctx = new (window.AudioContext||window.webkitAudioContext)();
     const o = ctx.createOscillator(); const g = ctx.createGain();
@@ -239,8 +247,8 @@ function chime_%s(){
   }catch(e){}
 }
 
-function pickVoice_%s(u){
-  if(!supported_%s) return;
+function pickVoice___KEY__(u){
+  if(!supported___KEY__) return;
   const voices = window.speechSynthesis.getVoices();
   const chosen = localStorage.getItem('cc_voiceName');
   let v = null;
@@ -248,18 +256,18 @@ function pickVoice_%s(u){
   if (!v) v = voices.find(x => /siri/i.test((x.name||'')+' '+(x.lang||''))) || null;
   if (v) u.voice = v;
 }
-function speakNow_%s(text){
-  if(!supported_%s) return;
+function speakNow___KEY__(text){
+  if(!supported___KEY__) return;
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = rate_%s; u.pitch = pitch_%s; u.lang = lang_%s;
-  pickVoice_%s(u);
+  u.rate = rate___KEY__; u.pitch = pitch___KEY__; u.lang = lang___KEY__;
+  pickVoice___KEY__(u);
   window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
 }
 
-function setPhase_%s(label, secs, action){
-  const big = document.getElementById("phaseBig_%s");
-  const count = document.getElementById("count_%s");
-  const circle = document.getElementById("circle_%s");
+function setPhase___KEY__(label, secs, action){
+  const big = document.getElementById("phaseBig___KEY__");
+  const count = document.getElementById("count___KEY__");
+  const circle = document.getElementById("circle___KEY__");
 
   big.innerText = label;
   let scale = 1.0;
@@ -274,92 +282,89 @@ function setPhase_%s(label, secs, action){
     if(remaining <= 0){ clearInterval(iv); }
     else { count.innerText = remaining; }
   }, 1000);
-  timers_%s.push(iv);
+  timers___KEY__.push(iv);
 }
 
-function clearTimers_%s(){ for (const t of timers_%s) clearInterval(t); timers_%s = []; }
+function clearTimers___KEY__(){ for (const t of timers___KEY__) clearInterval(t); timers___KEY__ = []; }
 
-function stopAll_%s(){
-  running_%s = false;
-  clearTimers_%s();
-  document.getElementById("phaseBig_%s").innerText = "Stopped";
-  document.getElementById("count_%s").innerText = "—";
-  document.getElementById("circle_%s").style.transform = "scale(1)";
-  if(supported_%s) window.speechSynthesis.cancel();
+function stopAll___KEY__(){
+  running___KEY__ = false;
+  clearTimers___KEY__();
+  document.getElementById("phaseBig___KEY__").innerText = "Stopped";
+  document.getElementById("count___KEY__").innerText = "—";
+  document.getElementById("circle___KEY__").style.transform = "scale(1)";
+  if(supported___KEY__) window.speechSynthesis.cancel();
 }
 
-function startFlow_%s(){
-  if(running_%s) return;
-  running_%s = true;
+function startFlow___KEY__(){
+  if(running___KEY__) return;
+  running___KEY__ = true;
   let cycle = 0;
   function runCycle(){
-    if(!running_%s) return;
-    if(cycle >= maxCycles_%s){ stopAll_%s(); return; }
+    if(!running___KEY__) return;
+    if(cycle >= maxCycles___KEY__){ stopAll___KEY__(); return; }
     let i = 0;
     function nextStep(){
-      if(!running_%s) return;
-      if(i >= steps_%s.length){ cycle += 1; runCycle(); return; }
-      const step = steps_%s[i];
+      if(!running___KEY__) return;
+      if(i >= steps___KEY__.length){ cycle += 1; runCycle(); return; }
+      const step = steps___KEY__[i];
       const label = step[0]; const secs = step[1]; const action = step[2];
-      setPhase_%s(label, secs, action);
-      %s
-      %s
+      setPhase___KEY__(label, secs, action);
+      __SPEAK_CALL__
+      __CHIME_CALL__
       let t = setTimeout(()=>{ i += 1; nextStep(); }, secs*1000);
-      timers_%s.push(t);
+      timers___KEY__.push(t);
     }
     nextStep();
   }
   runCycle();
 }
 
-document.getElementById("start_%s").onclick = startFlow_%s;
-document.getElementById("stop_%s").onclick = stopAll_%s;
+document.getElementById("start___KEY__").onclick = startFlow___KEY__;
+document.getElementById("stop___KEY__").onclick = stopAll___KEY__;
 </script>
-""" % (
-        pattern, cycles, key, key, key, key, key,
-        key, key, json.dumps(steps), key, cycles,
-        key, rate, key, pitch, key, lang,
-        key, key,
-        key,
-        key, key,
-        key, key,
-        key, key, key, key,
-        key, key, key, key,
-        key,
-        key, key, key, key, key,
-        "speakNow_%s(label);" % key,
-        "chime_%s();" % key if chime else "",
-        key,
-        key, key, key
+"""
+    html = _tpl(
+        template,
+        PATTERN=pattern,
+        CYCLES=cycles,
+        KEY=key,
+        STEPS=json.dumps(steps),
+        RATE=rate,
+        PITCH=pitch,
+        LANG=lang,
+        SPEAK_CALL=f"speakNow_{key}(label);",
+        CHIME_CALL=(f"chime_{key}();" if chime else "")
     )
     components.html(html, height=420)
 
 def sequence_caller(title, cues, interval_ms, rounds, key="seq", rate=None, pitch=None, lang=None):
-    """Voice + visual cue every interval (triangle gaze, etc.)."""
+    """Voice + visual cue every interval (triangle gaze, etc.). Safe templating."""
     rate = rate or st.session_state.voice_rate
     pitch = pitch or st.session_state.voice_pitch
     lang = lang or st.session_state.voice_lang
-    html = """
+
+    template = """
 <div class="card">
-  <div class="title">%s</div>
-  <div id="cue_%s" class="status" style="font-size:28px;">Ready</div>
-  <div class="timer" id="round_%s"></div>
+  <div class="title">__TITLE__</div>
+  <div id="cue___KEY__" class="status" style="font-size:28px;">Ready</div>
+  <div class="timer" id="round___KEY__"></div>
   <div class="action-row" style="display:flex;gap:8px;">
-    <button id="start_%s">▶️ Start</button>
-    <button id="stop_%s">⏹️ Stop</button>
+    <button id="start___KEY__">▶️ Start</button>
+    <button id="stop___KEY__">⏹️ Stop</button>
   </div>
   <div class="hint small">Keep blinking normally. Tiny natural glances are okay.</div>
 </div>
 <script>
-const cues_%s = %s;
-const interval_%s = %s;
-const rounds_%s = %s;
-const supported_%s = ('speechSynthesis' in window);
-let rate_%s = %s, pitch_%s = %s, lang_%s = "%s";
-let timer_%s = null, isRunning_%s = false;
+const cues___KEY__ = __CUES__;
+const interval___KEY__ = __INTERVAL__;
+const rounds___KEY__ = __ROUNDS__;
+const supported___KEY__ = ('speechSynthesis' in window);
+let rate___KEY__ = __RATE__, pitch___KEY__ = __PITCH__, lang___KEY__ = "__LANG__";
+let timer___KEY__ = null, isRunning___KEY__ = false;
 
-function pickVoice_%s(u){
-  if(!supported_%s) return;
+function pickVoice___KEY__(u){
+  if(!supported___KEY__) return;
   const voices = window.speechSynthesis.getVoices();
   const chosen = localStorage.getItem('cc_voiceName');
   let v = null;
@@ -367,54 +372,54 @@ function pickVoice_%s(u){
   if (!v) v = voices.find(x => /siri/i.test((x.name||'')+' '+(x.lang||''))) || null;
   if (v) u.voice = v;
 }
-function speak_%s(t){
-  if(!supported_%s) return;
+function speak___KEY__(t){
+  if(!supported___KEY__) return;
   const u = new SpeechSynthesisUtterance(t);
-  u.rate = rate_%s; u.pitch = pitch_%s; u.lang = lang_%s;
-  pickVoice_%s(u);
+  u.rate = rate___KEY__; u.pitch = pitch___KEY__; u.lang = lang___KEY__;
+  pickVoice___KEY__(u);
   window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
 }
-function stop_%s(){
-  isRunning_%s = false;
-  if(timer_%s) clearInterval(timer_%s);
-  document.getElementById("cue_%s").innerText = "Stopped";
-  document.getElementById("round_%s").innerText = "";
-  if(supported_%s) window.speechSynthesis.cancel();
+function stop___KEY__(){
+  isRunning___KEY__ = false;
+  if(timer___KEY__) clearInterval(timer___KEY__);
+  document.getElementById("cue___KEY__").innerText = "Stopped";
+  document.getElementById("round___KEY__").innerText = "";
+  if(supported___KEY__) window.speechSynthesis.cancel();
 }
-function start_%s(){
-  if(isRunning_%s) return;
-  isRunning_%s = true;
+function start___KEY__(){
+  if(isRunning___KEY__) return;
+  isRunning___KEY__ = true;
   let idx = 0; let count = 0;
-  document.getElementById("round_%s").innerText = "Round 1 of " + rounds_%s;
+  document.getElementById("round___KEY__").innerText = "Round 1 of " + rounds___KEY__;
   function tick(){
-     if(!isRunning_%s) return;
-     const text = cues_%s[idx % cues_%s.length];
-     document.getElementById("cue_%s").innerText = text;
-     speak_%s(text);
+     if(!isRunning___KEY__) return;
+     const text = cues___KEY__[idx % cues___KEY__.length];
+     document.getElementById("cue___KEY__").innerText = text;
+     speak___KEY__(text);
      idx += 1;
-     if(idx %% cues_%s.length === 0) {
+     if(idx % cues___KEY__.length === 0) {
         count += 1;
-        document.getElementById("round_%s").innerText = "Round " + (count+1) + " of " + rounds_%s;
-        if(count >= rounds_%s) { stop_%s(); }
+        document.getElementById("round___KEY__").innerText = "Round " + (count+1) + " of " + rounds___KEY__;
+        if(count >= rounds___KEY__) { stop___KEY__(); }
      }
   }
   tick();
-  timer_%s = setInterval(tick, interval_%s);
+  timer___KEY__ = setInterval(tick, interval___KEY__);
 }
-document.getElementById("start_%s").onclick = start_%s;
-document.getElementById("stop_%s").onclick = stop_%s;
+document.getElementById("start___KEY__").onclick = start___KEY__;
+document.getElementById("stop___KEY__").onclick = stop___KEY__;
 </script>
-""" % (
-        title, key, key, key, key,
-        key, json.dumps(cues),
-        key, interval_ms,
-        key, rounds,
-        key,
-        key, rate, key, pitch, key, lang,
-        key, key,
-        key, key,
-        key, key, key, key, key,
-        key, key, key, key, key, key, key, key, key
+"""
+    html = _tpl(
+        template,
+        TITLE=title,
+        KEY=key,
+        CUES=json.dumps(cues),
+        INTERVAL=interval_ms,
+        ROUNDS=rounds,
+        RATE=rate,
+        PITCH=pitch,
+        LANG=lang
     )
     components.html(html, height=260)
 
