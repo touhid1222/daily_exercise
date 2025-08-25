@@ -44,53 +44,177 @@ def _tpl(s: str, **vals) -> str:
 
 
 def render_global_css() -> None:
-    """Inject mobile-first CSS and shared UI classes."""
+    """
+    Inject mobile-first CSS with big, readable typography.
+    >>> To change sizes again, edit values below (look for font-size, min-height).
+    """
     st.markdown(
         """
 <style>
-html, body, [class^="css"]  { font-size: 18px; }
-.block-container { padding-top: 3rem; padding-bottom: 3rem; }
+/* ========= Design tokens (light) ========= */
+:root{
+  --bg: #f8fafc;                /* page background */
+  --surface: #ffffff;            /* card background */
+  --text: #0f172a;               /* main text */
+  --muted: #475569;              /* secondary text */
+  --border: #e2e8f0;             /* card/input borders */
+  --primary: #2563eb;            /* primary button */
+  --primary-contrast: #ffffff;   /* text on primary */
+  --focus: #60a5fa;              /* focus outline */
+  --pill-bg: #eef2ff;
+  --pill-text: #1e3a8a;
 
-/* Bigger controls for mobile */
-.stButton>button, button {
-  width: 100%; padding: 16px 18px; font-size: 18px;
-  border-radius: 14px; border: 1px solid #ddd;
+  /* Button defaults */
+  --btn-bg: var(--primary);
+  --btn-text: var(--primary-contrast);
+  --btn-border: transparent;
+  --btn-hover-filter: brightness(0.97);
+  --btn-active-filter: brightness(0.94);
 }
-.stDownloadButton>button { padding: 12px 14px; border-radius: 12px; }
+
+/* ========= Design tokens (dark) ========= */
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg: #0b0f14;
+    --surface: #111827;
+    --text: #e5e7eb;
+    --muted: #a9b8c9;
+    --border: #1f2937;
+    --primary: #3b82f6;
+    --primary-contrast: #0b0f14;
+    --focus: #60a5fa;
+    --pill-bg: #0b1b3a;
+    --pill-text: #c7d2fe;
+
+    --btn-bg: var(--primary);
+    --btn-text: var(--primary-contrast);
+    --btn-border: transparent;
+    --btn-hover-filter: brightness(1.05);
+    --btn-active-filter: brightness(1.08);
+  }
+}
+
+/* ========= Base layout & global typography =========
+   MAIN KNOB for app-wide text size: font-size
+*/
+html, body { 
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+[class^="css"] { font-size: 22px; line-height: 1.6; }  /* ⬅️ Global base text size */
+
+.block-container { 
+  padding-top: 3.8rem !important;  /* keep header visible */
+  padding-bottom: 3.2rem; 
+}
+
+/* ========= Links ========= */
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ========= Buttons (BIG & touch-friendly) =========
+   MAIN KNOBS: min-height, padding, font-size
+*/
+.stButton>button, .stDownloadButton>button, button { 
+  min-height: 64px;                 /* ⬅️ big touch target */
+  padding: 18px 22px;               /* ⬅️ thicker padding */
+  font-size: 22px;                  /* ⬅️ bigger label */
+  font-weight: 700;
+  border-radius: 18px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.18);
+  transition: transform .04s ease, filter .12s ease, box-shadow .2s ease;
+  cursor: pointer;
+}
+.stButton>button:hover, .stDownloadButton>button:hover, button:hover {
+  filter: var(--btn-hover-filter);
+  transform: translateY(-0.5px);
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.22);
+}
+.stButton>button:active, .stDownloadButton>button:active, button:active {
+  filter: var(--btn-active-filter);
+  transform: translateY(0);
+}
+.stButton>button:focus-visible, .stDownloadButton>button:focus-visible, button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Make download button a subtle/secondary style for contrast with primaries */
+.stDownloadButton>button{
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.stDownloadButton>button:hover{
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+/* ========= Inputs & selects =========
+   KNOB: font-size
+*/
 .stTextInput>div>div>input, .stTextArea textarea, select {
-  font-size: 18px; padding: 12px; border-radius: 12px;
+  font-size: 20px;                  /* ⬅️ larger input text */
+  padding: 16px 14px; 
+  border-radius: 16px;
+  background: var(--surface); 
+  color: var(--text);
+  border: 1px solid var(--border);
 }
-.stSlider { padding-top: 4px; }
+.stTextInput>div>div>input::placeholder, .stTextArea textarea::placeholder { color: var(--muted); }
 
-/* Cards & helpers */
-.card {border:1px solid #e7e7e7;border-radius:16px;padding:14px;margin:10px 0;background:#fff}
-.title {font-weight:700;font-size:1.25rem;margin-bottom:6px}
-.hint {color:#666;font-size:0.92rem}
-.small {font-size:0.85rem;}
-.center {text-align:center}
-.pill {display:inline-block;padding:4px 10px;border-radius:999px;background:#eef5ff;border:1px solid #cfe0ff;font-size:0.9rem;margin:2px 4px}
-.timer {font-size:46px;font-weight:700; text-align:center; margin:10px 0;}
-.status {font-size:26px;text-align:center;margin:4px 0 10px}
+/* ========= Cards & helpers ========= */
+.card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px;
+  margin: 14px 0;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.06);
+}
+/* KNOB: Title size */
+.title { font-weight: 800; font-size: 1.6rem; margin-bottom: 10px; }  /* ~25.6px */
+.hint  { color: var(--muted); font-size: 1.05rem; }
+.small { font-size: 0.98rem; }
+.center{ text-align: center; }
+.pill  { display:inline-block; padding:6px 12px; border-radius:999px; 
+         background: var(--pill-bg); color: var(--pill-text);
+         border: 1px solid rgba(99, 102, 241, 0.25); font-size:1rem; margin:2px 4px; }
 
-/* Breathing visual — bigger, smoother, with gradient bubble */
-.breath-wrap {display:flex;justify-content:center;align-items:center;margin:10px 0 16px}
+/* KNOBS: status/timer emphasis */
+.status{ font-size: 34px; text-align: center; margin: 8px 0 14px; color: var(--text);}
+.timer { font-size: 60px; font-weight: 800; text-align: center; margin: 14px 0; color: var(--text);}
+
+/* ========= Breathing visual ========= */
+.breath-wrap { display:flex; justify-content:center; align-items:center; margin:14px 0 20px; }
 .circle {
-  width: 240px; height: 240px; border-radius: 50%;
-  border: 4px solid #9fc5ff;
-  background: radial-gradient(circle at 50% 50%, #f7fbff 0%, #e9f3ff 60%, #d7e9ff 100%);
-  box-shadow: 0 0 0 rgba(159,197,255,0.6);
-  display:flex;justify-content:center;align-items:center;
-  transform:scale(1); transition: transform 0.7s ease;
+  width: 270px; height: 270px; border-radius: 50%;
+  border: 4px solid rgba(99, 102, 241, 0.35);
+  background: radial-gradient(circle at 50% 50%, #f7fbff 0%, #e9f3ff 58%, #d7e9ff 100%);
+  display:flex; justify-content:center; align-items:center;
+  transform: scale(1); transition: transform 0.7s ease;
+  box-shadow: inset 0 0 40px rgba(37, 99, 235, 0.08), 0 10px 30px rgba(37, 99, 235, 0.15);
 }
-.bigPhase { font-size: 34px; font-weight: 700; }
+@media (prefers-color-scheme: dark){
+  .circle{
+    background: radial-gradient(circle at 50% 50%, #0b1220 0%, #0f1c33 58%, #0c213e 100%);
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: inset 0 0 40px rgba(59, 130, 246, 0.18), 0 10px 30px rgba(37, 99, 235, 0.20);
+  }
+}
+.bigPhase { font-size: 44px; font-weight: 800; color: var(--text); }
 
-/* Meeting Primer card grid */
-.primer-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+/* ========= Meeting Primer grid ========= */
+.primer-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 800px) {
-  .primer-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .primer-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
 }
 
-footer {visibility: hidden;}
+footer { visibility: hidden; }
 </style>
 """,
         unsafe_allow_html=True,
@@ -129,8 +253,8 @@ def voice_picker_component() -> None:
         """
 <div class="card">
   <div class="title">🎙️ Voice Picker (curated)</div>
-  <select id="vp_select" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;"></select>
-  <div class="action-row" style="display:flex;gap:8px;margin-top:10px;">
+  <select id="vp_select" style="width:100%;padding:16px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--text)"></select>
+  <div class="action-row" style="display:flex;gap:12px;margin-top:12px;">
     <button id="vp_save">💾 Save</button>
     <button id="vp_test">🔊 Test voice</button>
   </div>
@@ -160,7 +284,6 @@ function curate(voices){
   }
   return picked.slice(0,5);
 }
-
 function loadVoices() {
   const sel = document.getElementById('vp_select');
   sel.innerHTML = '';
@@ -182,7 +305,6 @@ function loadVoices() {
 }
 window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
-
 document.getElementById('vp_save').onclick = () => {
   const name = document.getElementById('vp_select').value;
   localStorage.setItem('cc_voiceName', name);
@@ -198,7 +320,7 @@ document.getElementById('vp_test').onclick = () => {
 };
 </script>
 """,
-        height=230,
+        height=238,
     )
 
 
@@ -213,7 +335,7 @@ def tts_buttons(text: str, key: str, rate: float | None = None, pitch: float | N
     lang = lang or st.session_state.voice_lang
 
     html = f"""
-<div class="action-row" style="display:flex;gap:8px;">
+<div class="action-row" style="display:flex;gap:12px;">
   <button onclick="speak_{key}()">▶️ Speak</button>
   <button onclick="pause_{key}()">⏸️ Pause</button>
   <button onclick="resume_{key}()">⏩ Resume</button>
@@ -243,7 +365,7 @@ function resume_{key}() {{ if(supported_{key}) window.speechSynthesis.resume(); 
 function stop_{key}() {{ if(supported_{key}) window.speechSynthesis.cancel(); }}
 </script>
 """
-    components.html(html, height=70)
+    components.html(html, height=84)
 
 
 # ==============================
@@ -423,7 +545,7 @@ def breathing_component(
       </div>
     </div>
   </div>
-  <div class="action-row" style="display:flex;gap:8px;">
+  <div class="action-row" style="display:flex;gap:12px;">
     <button id="start___KEY__">▶️ Start</button>
     <button id="stop___KEY__">⏹️ Stop</button>
   </div>
@@ -539,7 +661,7 @@ document.getElementById("stop___KEY__").onclick = stopAll___KEY__;
         SPEAK_CALL=f"speakNow_{key}(label);",
         CHIME_CALL=(f"chime_{key}();" if chime else ""),
     )
-    components.html(html, height=420)
+    components.html(html, height=450)
 
 
 def sequence_caller(
@@ -563,9 +685,9 @@ def sequence_caller(
     template = """
 <div class="card">
   <div class="title">__TITLE__</div>
-  <div id="cue___KEY__" class="status" style="font-size:28px;">Ready</div>
+  <div id="cue___KEY__" class="status" style="font-size:30px;">Ready</div>
   <div class="timer" id="round___KEY__"></div>
-  <div class="action-row" style="display:flex;gap:8px;">
+  <div class="action-row" style="display:flex;gap:12px;">
     <button id="start___KEY__">▶️ Start</button>
     <button id="stop___KEY__">⏹️ Stop</button>
   </div>
@@ -637,7 +759,7 @@ document.getElementById("stop___KEY__").onclick = stop___KEY__;
         PITCH=pitch,
         LANG=lang,
     )
-    components.html(html, height=260)
+    components.html(html, height=280)
 
 
 # ==============================
@@ -693,7 +815,7 @@ def anti_silence_widget(meeting_type: str, haptics: bool = True, key: str = "mp_
 <div class="card">
   <div class="title">🗣️ Anti-silence — tap “Next”</div>
   <div id="as_line___KEY__" class="status">Ready</div>
-  <div class="action-row" style="display:flex;gap:8px;">
+  <div class="action-row" style="display:flex;gap:12px;">
     <button id="as_next___KEY__">Next</button>
     <button id="as_repeat___KEY__">Repeat</button>
   </div>
@@ -740,7 +862,7 @@ document.getElementById("as_repeat___KEY__").onclick = ()=>showLine___KEY__(true
         LINES=json.dumps(lines),
         HAPTICS="true" if haptics else "false",
     )
-    components.html(html, height=210)
+    components.html(html, height=224)
 
 
 def build_pra_card(purpose: str, results: str, risks_asks: str, decision_needed: bool) -> None:
@@ -755,7 +877,7 @@ def build_pra_card(purpose: str, results: str, risks_asks: str, decision_needed:
     )
     st.markdown(
         f"""<div class="card"><div class="title">P-R-A Card</div>
-<pre style="white-space:pre-wrap;font-size:16px">{pra}</pre></div>""",
+<pre style="white-space:pre-wrap;font-size:18px">{pra}</pre></div>""",
         unsafe_allow_html=True,
     )
     try:
@@ -927,7 +1049,7 @@ elif menu == "Micro-Exposure":
         "What’s the key number and why it matters?",
         "Say a reset line: Let me summarize this step.",
     ]
-    prompts_txt = st.text_area("Edit prompts (one per line)", value="\n".join(prompts_default), height=140)
+    prompts_txt = st.text_area("Edit prompts (one per line)", value="\n".join(prompts_default), height=160)
     prompts = [p.strip() for p in prompts_txt.split("\n") if p.strip()]
     secs = st.slider("Speaking time per prompt (seconds)", 20, 120, 45)
     rounds = st.slider("How many prompts this session?", 1, min(10, len(prompts)), 4)
